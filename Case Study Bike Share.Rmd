@@ -1,0 +1,214 @@
+---
+title: "Case Study - Bike Share"
+author: "Andrea"
+date: "2/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a case study of a bike sharing company that wants his marketing department to create campaigns targeting his casual riders so that some of they could become members, customers of the annual membership.
+
+## Business Task
+
+The business task is understand the behavior of both types of customers: casual riders and members. Understand the differences in their use of the services so that the company can maximize the number of member (more profitable users for the company).
+
+
+## Data sources
+
+The data analyzed are the data trips of the twelve previous months. The data is public and has been made available by Motivate International Inc. under this [license](https://www.divvybikes.com/data-license-agreement).
+
+All data is anonymous, there is no personal data from riders.
+
+## Data cleaning
+
+Load packages to be used.
+```{r Load packages to be used}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+Import data from 12 previous months from the working directory
+```{r Import data from 12 previous months from the working directory}
+X202004_divvy_tripdata <- read_csv("202004-divvy-tripdata.csv")
+X202005_divvy_tripdata <- read_csv("202005-divvy-tripdata.csv")
+X202006_divvy_tripdata <- read_csv("202006-divvy-tripdata.csv")
+X202007_divvy_tripdata <- read_csv("202007-divvy-tripdata.csv")
+X202008_divvy_tripdata <- read_csv("202008-divvy-tripdata.csv")
+X202009_divvy_tripdata <- read_csv("202009-divvy-tripdata.csv")
+X202010_divvy_tripdata <- read_csv("202010-divvy-tripdata.csv")
+X202011_divvy_tripdata <- read_csv("202011-divvy-tripdata.csv")
+X202012_divvy_tripdata <- read_csv("202012-divvy-tripdata.csv")
+X202101_divvy_tripdata <- read_csv("202101-divvy-tripdata.csv")
+X202102_divvy_tripdata <- read_csv("202102-divvy-tripdata.csv")
+X202103_divvy_tripdata <- read_csv("202103-divvy-tripdata.csv")
+X202104_divvy_tripdata <- read_csv("202104-divvy-tripdata.csv")
+```
+Mutate the format of start station and end station into character in the files that has a double format
+```{r Mutate the format of start station and end station into character in the files that has a double format}
+X202011_divvy_tripdata <-  mutate(X202011_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id))
+X202010_divvy_tripdata <-  mutate(X202010_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id)) 
+X202009_divvy_tripdata <-  mutate(X202009_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id)) 
+X202008_divvy_tripdata <-  mutate(X202008_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id)) 
+X202007_divvy_tripdata <-  mutate(X202007_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id)) 
+X202006_divvy_tripdata <-  mutate(X202006_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id)) 
+X202005_divvy_tripdata <-  mutate(X202005_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id)) 
+X202004_divvy_tripdata <-  mutate(X202004_divvy_tripdata, 
+                                  start_station_id = as.character(start_station_id), 
+                                  end_station_id = as.character(end_station_id))
+```
+
+Join all data frames
+```{r Join all data frames}
+all_trips <- bind_rows(X202004_divvy_tripdata, X202005_divvy_tripdata, X202006_divvy_tripdata, 
+                       X202007_divvy_tripdata, X202008_divvy_tripdata, X202009_divvy_tripdata, 
+                       X202010_divvy_tripdata, X202011_divvy_tripdata, X202012_divvy_tripdata, 
+                       X202101_divvy_tripdata, X202102_divvy_tripdata, X202103_divvy_tripdata, 
+                       X202104_divvy_tripdata)
+```
+
+Inspect the dataset to see columns, structure, formats and summary
+```{r Inspect the dataset to see columns, structure, formats and summary}
+colnames(all_trips)  
+nrow(all_trips)  
+dim(all_trips) 
+head(all_trips) 
+str(all_trips) 
+summary(all_trips) 
+```
+
+Add columns that list the date, month, day, and year of each ride so that later we can agregate by them
+```{r Add columns that list the date, month, day, and year of each ride so that later we can agregate by them}
+all_trips$date <- as.Date(all_trips$started_at)
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$day <- format(as.Date(all_trips$date), "%d")
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+
+```
+ 
+Add a ride_length calculation to all_trips (in seconds) and check all new fields
+```{r Add a ride_length calculation to all_trips (in seconds)}
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at)
+all_trips %>% 
+  select(date, month, day, year, day_of_week, ride_length)
+```
+
+Convert "ride_length" from Factor to numeric so we can run calculations on the data
+```{r Convert "ride_length" from Factor to numeric so we can run calculations on the data}
+
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+is.numeric(all_trips$ride_length)
+```
+
+Remove bad data (quality check trips and rows with ride_length negative) and create a new version
+```{r Remove bad data (quality checks trips and rows with ride_length negative) and create a new version}
+all_trips_v2 <- all_trips[!(all_trips$start_station_name == "HQ QR" | all_trips$ride_length<0),]
+```
+
+
+Created a new data frame with all the duplicates from the last version to check that all have ride_id with value NA
+```{r Created a new data frame with all the duplicates from the last version to check that all have ride_id with value NA}
+duplicates <- data.frame(ride_id = all_trips_v2$ride_id , dup_indicator = duplicated(all_trips_v2$ride_id), 
+                         started_at = all_trips_v2$started_at, ended_at = all_trips_v2$ended_at)
+filter(duplicates, dup_indicator=="TRUE")
+```
+
+## Analysis
+
+Descriptive analysis on ride_length (all figures in seconds)
+```{r Descriptive analysis on ride_length (all figures in seconds)}
+summary(all_trips_v2$ride_length)
+```
+Compare members and casual users
+```{r Compare members and casual users}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = max)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)
+```
+See the average ride time and number of rides by each day for members vs casual users
+```{r See the average ride time and number of rides by each day for members vs casual users}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = length)
+```
+
+Analyze ridership data by user type and weekday
+```{r Analyze ridership data by user type and weekday}
+
+
+all_trips_v2 %>% 
+  group_by(member_casual, day_of_week) %>%  
+  summarise(number_of_rides = n()		
+            ,average_duration = mean(ride_length)) %>% 	
+  arrange(member_casual, day_of_week)	
+```
+
+From this information you can conclude that:
+
+* Casual users: use the service for leisure, taking long rides mostly on weekends.
+* Members: use the service for work/school purposes, taking shorter rides mostly on weekdays.
+
+## Visualizations
+
+Number of rides by rider type and day of the week
+```{r Number of rides by rider type}
+all_trips_v2 %>% 
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  drop_na(day_of_week) %>% 
+  arrange(member_casual, day_of_week)  %>% 
+  ggplot(aes(x = day_of_week, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Number of rides by rider type and day of the week")
+```
+
+Average duration of rides by rider type and day of the week
+```{r Average duration}
+all_trips_v2 %>% 
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  drop_na(day_of_week) %>%
+  arrange(member_casual, day_of_week)  %>% 
+  ggplot(aes(x = day_of_week, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Average duration of rides by rider type and day of the week")
+```
+Create a summary csv for use in other software
+```{r Create a csv for use in other software}
+res <- all_trips_v2 %>% 
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  drop_na(day_of_week) %>%
+  arrange(member_casual, day_of_week)
+write.csv(res, file = "res.csv")
+```
+
+
+## Recomendations for the marketing team
+### Where should their digital (social media, email and other) campaigns  focus
+
+* Encourage casual riders to use the service regularly for work or school.
+* Encourage causal riders to use the service for shorter rides (run errands, dates etc.) reminding of the benefits of using it instead of other means of transportation.
+* Equate the biking service as other mean of transport so it can be used on a daily basis, not only for leisure.
+
